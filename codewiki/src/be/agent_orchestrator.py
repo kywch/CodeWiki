@@ -68,7 +68,11 @@ class AgentOrchestrator:
         self.custom_instructions = config.get_prompt_addition() if config else None
 
     def create_agent(
-        self, module_name: str, components: Dict[str, Any], core_component_ids: List[str]
+        self,
+        module_name: str,
+        components: Dict[str, Any],
+        core_component_ids: List[str],
+        relative_root_path: str = "../",
     ) -> Agent:
         """Create an appropriate agent based on module complexity."""
 
@@ -82,7 +86,9 @@ class AgentOrchestrator:
                     str_replace_editor_tool,
                     generate_sub_module_documentation_tool,
                 ],
-                system_prompt=format_system_prompt(module_name, self.custom_instructions),
+                system_prompt=format_system_prompt(
+                    module_name, self.custom_instructions, relative_root_path
+                ),
             )
         else:
             return Agent(
@@ -90,7 +96,9 @@ class AgentOrchestrator:
                 name=module_name,
                 deps_type=CodeWikiDeps,
                 tools=[read_code_components_tool, str_replace_editor_tool],
-                system_prompt=format_leaf_system_prompt(module_name, self.custom_instructions),
+                system_prompt=format_leaf_system_prompt(
+                    module_name, self.custom_instructions, relative_root_path
+                ),
             )
 
     async def process_module(
@@ -108,8 +116,14 @@ class AgentOrchestrator:
         module_tree_path = os.path.join(working_dir, MODULE_TREE_FILENAME)
         module_tree = file_manager.load_json(module_tree_path)
 
+        # Compute relative path from docs dir to repo root
+        repo_path = os.path.abspath(self.config.repo_path)
+        abs_working_dir = os.path.abspath(working_dir)
+        relative_root_path = os.path.relpath(repo_path, abs_working_dir)
+        relative_root_path = relative_root_path + "/" if relative_root_path != "." else "./"
+
         # Create agent
-        agent = self.create_agent(module_name, components, core_component_ids)
+        agent = self.create_agent(module_name, components, core_component_ids, relative_root_path)
 
         # Create dependencies
         deps = CodeWikiDeps(
@@ -142,7 +156,9 @@ class AgentOrchestrator:
             logger.info(f"Using one-shot predictive generation via Gemini CLI for {module_name}")
             from codewiki.src.be.llm_services import call_llm
 
-            system_prompt = format_leaf_system_prompt(module_name, self.custom_instructions)
+            system_prompt = format_leaf_system_prompt(
+                module_name, self.custom_instructions, relative_root_path
+            )
             # Add instruction for one-shot output
             system_prompt += "\n\nIMPORTANT: Output the FULL markdown documentation enclosed within <DOCUMENTATION> and </DOCUMENTATION> tags. DO NOT use the edit tools."
 

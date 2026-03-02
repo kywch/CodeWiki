@@ -1,0 +1,35 @@
+{
+    "generation_info": {
+        "timestamp": "2026-03-02T12:45:04.150017",
+        "main_model": null,
+        "generator_version": "1.0.1",
+        "repo_path": "/workspace/rlwrld/CodeWiki",
+        "commit_id": null
+    },
+    "statistics": {
+        "total_components": 404,
+        "leaf_nodes": 104,
+        "max_depth": 2
+    },
+    "files_generated": [
+        "overview.md",
+        "module_tree.json",
+        "first_module_tree.json",
+        "cli.md",
+        "frontend_background_worker.md",
+        "dependency_analyzer.md",
+        "agent_tools.md",
+        "backend_orchestration.md",
+        "config.md",
+        "backend.md",
+        "cli_infrastructure.md",
+        "frontend_github_processing.md",
+        "cli_generators.md",
+        "frontend_cache_management.md",
+        "frontend_web_interface.md",
+        "utils.md",
+        "cli_models.md",
+        "frontend.md",
+        "core.md"
+    ]
+}

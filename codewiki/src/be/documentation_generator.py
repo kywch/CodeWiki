@@ -357,9 +357,16 @@ class DocumentationGenerator:
                 output_path=working_dir,
             )
 
-            # Gemini returns content in stdout; save it
-            file_manager.save_text(doc_content, docs_path)
-            logger.info(f"✓ Generated documentation for {module_name} (Gemini CLI)")
+            # Check if Gemini CLI already created the file (via tools)
+            # If so, don't overwrite with the response (which may be a confirmation message)
+            if os.path.exists(docs_path):
+                logger.info(
+                    f"✓ Generated documentation for {module_name} (file created by Gemini CLI)"
+                )
+            else:
+                # Gemini returned documentation in stdout, save it
+                file_manager.save_text(doc_content, docs_path)
+                logger.info(f"✓ Generated documentation for {module_name} (Gemini CLI)")
 
             return module_tree
 

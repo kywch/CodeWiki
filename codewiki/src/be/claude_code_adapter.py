@@ -30,6 +30,7 @@ if the prompt exceeds the configurable `max_prompt_tokens` limit (default: 180K 
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -60,7 +61,9 @@ DEFAULT_MAX_PROMPT_TOKENS = 180_000
 class ClaudeCodeError(Exception):
     """Exception raised when Claude Code CLI invocation fails."""
 
-    def __init__(self, message: str, returncode: Optional[int] = None, stderr: Optional[str] = None):
+    def __init__(
+        self, message: str, returncode: Optional[int] = None, stderr: Optional[str] = None
+    ):
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr
@@ -122,7 +125,9 @@ def _invoke_claude_code(
     prompt_chars = len(prompt)
     prompt_tokens_estimate = prompt_chars // 4  # Rough estimate: ~4 chars per token
 
-    logger.info(f"Prompt size: {prompt_chars:,} chars (~{prompt_tokens_estimate:,} tokens estimated)")
+    logger.info(
+        f"Prompt size: {prompt_chars:,} chars (~{prompt_tokens_estimate:,} tokens estimated)"
+    )
 
     # Check prompt size limit before invoking CLI
     if prompt_tokens_estimate > max_prompt_tokens:
@@ -151,6 +156,7 @@ def _invoke_claude_code(
     try:
         # Inherit environment and add any Claude-specific env vars
         import os
+
         env = os.environ.copy()
 
         result = subprocess.run(
@@ -224,7 +230,9 @@ def claude_code_cluster(
                     lines.append(f"{'  ' * indent}{key} (current module)")
                 else:
                     lines.append(f"{'  ' * indent}{key}")
-                lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}")
+                lines.append(
+                    f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}"
+                )
                 children = value.get("children", {})
                 if isinstance(children, dict) and len(children) > 0:
                     lines.append(f"{'  ' * (indent + 1)} Children:")
@@ -250,10 +258,14 @@ def claude_code_cluster(
     # Parse the response - expect JSON wrapped in <GROUPED_COMPONENTS> tags
     try:
         if "<GROUPED_COMPONENTS>" not in response or "</GROUPED_COMPONENTS>" not in response:
-            logger.error(f"Invalid Claude Code response format - missing component tags: {response[:200]}...")
+            logger.error(
+                f"Invalid Claude Code response format - missing component tags: {response[:200]}..."
+            )
             return {}
 
-        response_content = response.split("<GROUPED_COMPONENTS>")[1].split("</GROUPED_COMPONENTS>")[0]
+        response_content = response.split("<GROUPED_COMPONENTS>")[1].split("</GROUPED_COMPONENTS>")[
+            0
+        ]
         module_tree = eval(response_content.strip())
 
         if not isinstance(module_tree, dict):
@@ -306,11 +318,20 @@ def claude_code_generate_docs(
     if hasattr(config, "get_prompt_addition"):
         custom_instructions = config.get_prompt_addition()
 
+    repo_path = getattr(config, "repo_path", None)
+    if repo_path and output_path:
+        relative_root_path = os.path.relpath(repo_path, output_path)
+        relative_root_path = relative_root_path + "/" if relative_root_path != "." else "./"
+    else:
+        relative_root_path = "../"
+
     # Build system prompt based on complexity
     if is_complex:
-        system_prompt = format_system_prompt(module_name, custom_instructions)
+        system_prompt = format_system_prompt(module_name, custom_instructions, relative_root_path)
     else:
-        system_prompt = format_leaf_system_prompt(module_name, custom_instructions)
+        system_prompt = format_leaf_system_prompt(
+            module_name, custom_instructions, relative_root_path
+        )
 
     # Build user prompt with module context
     user_prompt = format_user_prompt(
@@ -339,16 +360,18 @@ Save the documentation to: {output_path}/{module_name}.md
     # Get timeout and path from config
     timeout = getattr(config, "claude_code_timeout", DEFAULT_CLAUDE_CODE_TIMEOUT)
     claude_path = getattr(config, "claude_code_path", None)
-    repo_path = getattr(config, "repo_path", None)
 
-    # Invoke Claude Code CLI
-    logger.info(f"Invoking Claude Code CLI for documentation: {module_name}")
     response = _invoke_claude_code(
         full_prompt,
         timeout=timeout,
         claude_code_path=claude_path,
-        working_dir=repo_path,
+        working_dir=output_path,
     )
+
+    # Strip conversational text before the first markdown heading
+    first_heading_idx = response.find("# ")
+    if first_heading_idx != -1:
+        response = response[first_heading_idx:]
 
     return response
 

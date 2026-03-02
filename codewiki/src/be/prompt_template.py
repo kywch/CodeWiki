@@ -27,6 +27,12 @@ Generate documentation following this structure:
    - Mermaid diagrams for architecture, dependencies, and data flow
    - Component interaction diagrams
    - Process flow diagrams where relevant
+
+4. **Code References**:
+   - Whenever ANY file, component, class, or function is mentioned, you MUST include a direct markdown link to its file path.
+   - Format: Place backticks INSIDE the brackets for the name, and prefix the path with `{relative_root_path}` to correctly link from the docs directory to the repository root.
+   - If referencing a specific component from the `<MODULE_TREE>`, you MUST append its exact starting line number to the link as an anchor. The line number is provided next to the component names in the `<MODULE_TREE>`.
+   - Example: [`ConfigManager`]({relative_root_path}codewiki/cli/config_manager.py#L10) or [`config.py`]({relative_root_path}codewiki/src/config.py)
 </DOCUMENTATION_STRUCTURE>
 
 <WORKFLOW>
@@ -62,6 +68,7 @@ Generate documentation following the following requirements:
 1. Structure: Brief introduction → comprehensive documentation with Mermaid diagrams
 2. Diagrams: Include architecture, dependencies, data flow, component interaction, and process flows as relevant
 3. References: Link to other module documentation instead of duplicating information
+4. Code Links: Whenever ANY file, component, class, or function is mentioned, you MUST include a direct markdown link to its file path. Place backticks INSIDE the brackets, and prefix paths with `{relative_root_path}` (e.g., [`ConfigManager`]({relative_root_path}codewiki/cli/config_manager.py)). If referencing a specific component from the `<MODULE_TREE>`, you MUST append its exact starting line number to the link as an anchor (e.g., `#L10`). The line number is provided next to the component names in the `<MODULE_TREE>`.
 </DOCUMENTATION_REQUIREMENTS>
 
 <WORKFLOW>
@@ -237,26 +244,31 @@ EXTENSION_TO_LANGUAGE = {
     ".cs": "csharp",
     ".php": "php",
     ".phtml": "php",
-    ".inc": "php"
+    ".inc": "php",
 }
 
 
-def format_user_prompt(module_name: str, core_component_ids: list[str], components: Dict[str, Any], module_tree: dict[str, any]) -> str:
+def format_user_prompt(
+    module_name: str,
+    core_component_ids: list[str],
+    components: Dict[str, Any],
+    module_tree: dict[str, any],
+) -> str:
     """
     Format the user prompt with module name and organized core component codes.
-    
+
     Args:
         module_name: Name of the module to document
         core_component_ids: List of component IDs to include
         components: Dictionary mapping component IDs to CodeComponent objects
-    
+
     Returns:
         Formatted user prompt string
     """
 
     # format module tree
     lines = []
-    
+
     def _format_module_tree(module_tree: dict[str, any], indent: int = 0):
         for key, value in module_tree.items():
             if key == module_name:
@@ -264,12 +276,21 @@ def format_user_prompt(module_name: str, core_component_ids: list[str], componen
             else:
                 lines.append(f"{'  ' * indent}{key}")
 
-            lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}")
+            component_display = []
+            for comp_id in value.get("components", []):
+                if comp_id in components:
+                    comp = components[comp_id]
+                    # Append start line to the component name
+                    component_display.append(f"{comp_id} (L{comp.start_line})")
+                else:
+                    component_display.append(comp_id)
+
+            lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(component_display)}")
             children = value.get("children", {})
             if isinstance(children, dict) and len(children) > 0:
                 lines.append(f"{'  ' * (indent + 1)} Children:")
                 _format_module_tree(children, indent + 2)
-    
+
     _format_module_tree(module_tree, 0)
     formatted_module_tree = "\n".join(lines)
 
@@ -290,25 +311,34 @@ def format_user_prompt(module_name: str, core_component_ids: list[str], componen
     for path, component_ids_in_file in grouped_components.items():
         core_component_codes += f"# File: {path}\n\n"
         core_component_codes += f"## Core Components in this file:\n"
-        
+
         for component_id in component_ids_in_file:
             core_component_codes += f"- {component_id}\n"
-        
-        core_component_codes += f"\n## File Content:\n```{EXTENSION_TO_LANGUAGE['.'+path.split('.')[-1]]}\n"
-        
+
+        core_component_codes += (
+            f"\n## File Content:\n```{EXTENSION_TO_LANGUAGE['.' + path.split('.')[-1]]}\n"
+        )
+
         # Read content of the file using the first component's file path
         try:
-            core_component_codes += file_manager.load_text(components[component_ids_in_file[0]].file_path)
+            core_component_codes += file_manager.load_text(
+                components[component_ids_in_file[0]].file_path
+            )
         except (FileNotFoundError, IOError) as e:
             core_component_codes += f"# Error reading file: {e}\n"
-        
+
         core_component_codes += "```\n\n"
-        
-    return USER_PROMPT.format(module_name=module_name, formatted_core_component_codes=core_component_codes, module_tree=formatted_module_tree)
+
+    return USER_PROMPT.format(
+        module_name=module_name,
+        formatted_core_component_codes=core_component_codes,
+        module_tree=formatted_module_tree,
+    )
 
 
-
-def format_cluster_prompt(potential_core_components: str, module_tree: dict[str, any] = {}, module_name: str = None) -> str:
+def format_cluster_prompt(
+    potential_core_components: str, module_tree: dict[str, any] = {}, module_name: str = None
+) -> str:
     """
     Format the cluster prompt with potential core components and module tree.
     """
@@ -317,7 +347,7 @@ def format_cluster_prompt(potential_core_components: str, module_tree: dict[str,
     lines = []
 
     # print(f"Module tree:\n{json.dumps(module_tree, indent=2)}")
-    
+
     def _format_module_tree(module_tree: dict[str, any], indent: int = 0):
         for key, value in module_tree.items():
             if key == module_name:
@@ -325,7 +355,9 @@ def format_cluster_prompt(potential_core_components: str, module_tree: dict[str,
             else:
                 lines.append(f"{'  ' * indent}{key}")
 
-            lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}")
+            lines.append(
+                f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}"
+            )
             children = value.get("children", {})
             if isinstance(children, dict) and len(children) > 0:
                 lines.append(f"{'  ' * (indent + 1)} Children:")
@@ -337,40 +369,58 @@ def format_cluster_prompt(potential_core_components: str, module_tree: dict[str,
     if module_tree == {}:
         return CLUSTER_REPO_PROMPT.format(potential_core_components=potential_core_components)
     else:
-        return CLUSTER_MODULE_PROMPT.format(potential_core_components=potential_core_components, module_tree=formatted_module_tree, module_name=module_name)
+        return CLUSTER_MODULE_PROMPT.format(
+            potential_core_components=potential_core_components,
+            module_tree=formatted_module_tree,
+            module_name=module_name,
+        )
 
 
-def format_system_prompt(module_name: str, custom_instructions: str = None) -> str:
+def format_system_prompt(
+    module_name: str, custom_instructions: str = None, relative_root_path: str = "../"
+) -> str:
     """
     Format the system prompt with module name and optional custom instructions.
-    
+
     Args:
         module_name: Name of the module to document
         custom_instructions: Optional custom instructions to append
-        
+        relative_root_path: Relative path prefix to the repository root (e.g., '../')
+
     Returns:
         Formatted system prompt string
     """
     custom_section = ""
     if custom_instructions:
         custom_section = f"\n\n<CUSTOM_INSTRUCTIONS>\n{custom_instructions}\n</CUSTOM_INSTRUCTIONS>"
-    
-    return SYSTEM_PROMPT.format(module_name=module_name, custom_instructions=custom_section).strip()
+
+    return SYSTEM_PROMPT.format(
+        module_name=module_name,
+        custom_instructions=custom_section,
+        relative_root_path=relative_root_path,
+    ).strip()
 
 
-def format_leaf_system_prompt(module_name: str, custom_instructions: str = None) -> str:
+def format_leaf_system_prompt(
+    module_name: str, custom_instructions: str = None, relative_root_path: str = "../"
+) -> str:
     """
     Format the leaf system prompt with module name and optional custom instructions.
-    
+
     Args:
         module_name: Name of the module to document
         custom_instructions: Optional custom instructions to append
-        
+        relative_root_path: Relative path prefix to the repository root (e.g., '../')
+
     Returns:
         Formatted leaf system prompt string
     """
     custom_section = ""
     if custom_instructions:
         custom_section = f"\n\n<CUSTOM_INSTRUCTIONS>\n{custom_instructions}\n</CUSTOM_INSTRUCTIONS>"
-    
-    return LEAF_SYSTEM_PROMPT.format(module_name=module_name, custom_instructions=custom_section).strip()
+
+    return LEAF_SYSTEM_PROMPT.format(
+        module_name=module_name,
+        custom_instructions=custom_section,
+        relative_root_path=relative_root_path,
+    ).strip()

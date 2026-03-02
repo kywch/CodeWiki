@@ -28,6 +28,7 @@ if the prompt exceeds the configurable `max_prompt_tokens` limit (default: 900K 
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -388,11 +389,20 @@ def gemini_code_generate_docs(
     if hasattr(config, "get_prompt_addition"):
         custom_instructions = config.get_prompt_addition()
 
+    repo_path = getattr(config, "repo_path", None)
+    if repo_path and output_path:
+        relative_root_path = os.path.relpath(repo_path, output_path)
+        relative_root_path = relative_root_path + "/" if relative_root_path != "." else "./"
+    else:
+        relative_root_path = "../"
+
     # Build system prompt based on complexity
     if is_complex:
-        system_prompt = format_system_prompt(module_name, custom_instructions)
+        system_prompt = format_system_prompt(module_name, custom_instructions, relative_root_path)
     else:
-        system_prompt = format_leaf_system_prompt(module_name, custom_instructions)
+        system_prompt = format_leaf_system_prompt(
+            module_name, custom_instructions, relative_root_path
+        )
 
     # Build user prompt with module context
     user_prompt = format_user_prompt(
@@ -420,16 +430,18 @@ Save the documentation to: {output_path}/{module_name}.md
     # Get timeout and path from config
     timeout = getattr(config, "gemini_code_timeout", DEFAULT_GEMINI_CODE_TIMEOUT)
     gemini_path = getattr(config, "gemini_code_path", None)
-    repo_path = getattr(config, "repo_path", None)
 
-    # Invoke Gemini CLI
-    logger.info(f"Invoking Gemini CLI for documentation: {module_name}")
     response = _invoke_gemini_code(
         full_prompt,
         timeout=timeout,
         gemini_code_path=gemini_path,
-        working_dir=repo_path,
+        working_dir=output_path,
     )
+
+    # Strip conversational text before the first markdown heading
+    first_heading_idx = response.find("# ")
+    if first_heading_idx != -1:
+        response = response[first_heading_idx:]
 
     return response
 

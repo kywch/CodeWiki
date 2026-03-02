@@ -26,34 +26,37 @@ from codewiki.src.config import Config as BackendConfig, set_cli_context
 class CLIDocumentationGenerator:
     """
     CLI adapter for documentation generation with progress reporting.
-    
+
     This class wraps the backend documentation generator and adds
     CLI-specific features like progress tracking and error handling.
     """
-    
+
     def __init__(
         self,
         repo_path: Path,
         output_dir: Path,
         config: Dict[str, Any],
         verbose: bool = False,
-        generate_html: bool = False
+        generate_html: bool = False,
+        target_file: str = None
     ):
         """
         Initialize the CLI documentation generator.
-        
+
         Args:
             repo_path: Repository path
             output_dir: Output directory
             config: LLM configuration
             verbose: Enable verbose output
             generate_html: Whether to generate HTML viewer
+            target_file: Optional path to a single file for focused documentation
         """
         self.repo_path = repo_path
         self.output_dir = output_dir
         self.config = config
         self.verbose = verbose
         self.generate_html = generate_html
+        self.target_file = target_file
         self.progress_tracker = ProgressTracker(total_stages=5, verbose=verbose)
         self.job = DocumentationJob()
         
@@ -141,7 +144,10 @@ class CLIDocumentationGenerator:
                 max_token_per_module=self.config.get('max_token_per_module', 36369),
                 max_token_per_leaf_module=self.config.get('max_token_per_leaf_module', 16000),
                 max_depth=self.config.get('max_depth', 2),
-                agent_instructions=self.config.get('agent_instructions')
+                agent_instructions=self.config.get('agent_instructions'),
+                target_file=self.target_file,
+                use_claude_code=self.config.get('use_claude_code', False),
+                use_gemini_code=self.config.get('use_gemini_code', False),
             )
             
             # Run backend documentation generation
@@ -196,29 +202,50 @@ class CLIDocumentationGenerator:
         
         # Stage 2: Module Clustering
         self.progress_tracker.start_stage(2, "Module Clustering")
-        if self.verbose:
-            self.progress_tracker.update_stage(0.5, "Clustering modules with LLM...")
-        
-        # Import clustering function
+
+        # Determine clustering method based on config
+        use_claude_code = backend_config.use_claude_code
+        use_gemini_code = backend_config.use_gemini_code
+        if use_claude_code:
+            if self.verbose:
+                self.progress_tracker.update_stage(0.5, "Clustering modules with Claude Code CLI...")
+        elif use_gemini_code:
+            if self.verbose:
+                self.progress_tracker.update_stage(0.5, "Clustering modules with Gemini CLI...")
+        else:
+            if self.verbose:
+                self.progress_tracker.update_stage(0.5, "Clustering modules with LLM...")
+
+        # Import clustering functions
         from codewiki.src.be.cluster_modules import cluster_modules
         from codewiki.src.utils import file_manager
         from codewiki.src.config import FIRST_MODULE_TREE_FILENAME, MODULE_TREE_FILENAME
-        
+
         working_dir = str(self.output_dir.absolute())
         file_manager.ensure_directory(working_dir)
         first_module_tree_path = os.path.join(working_dir, FIRST_MODULE_TREE_FILENAME)
         module_tree_path = os.path.join(working_dir, MODULE_TREE_FILENAME)
-        
+
         try:
             if os.path.exists(first_module_tree_path):
                 module_tree = file_manager.load_json(first_module_tree_path)
             else:
-                module_tree = cluster_modules(leaf_nodes, components, backend_config)
+                if use_claude_code:
+                    # Use Claude Code CLI for clustering
+                    from codewiki.src.be.claude_code_adapter import claude_code_cluster
+                    module_tree = claude_code_cluster(leaf_nodes, components, backend_config)
+                elif use_gemini_code:
+                    # Use Gemini CLI for clustering (larger context window)
+                    from codewiki.src.be.gemini_code_adapter import gemini_code_cluster
+                    module_tree = gemini_code_cluster(leaf_nodes, components, backend_config)
+                else:
+                    # Use standard LLM clustering
+                    module_tree = cluster_modules(leaf_nodes, components, backend_config)
                 file_manager.save_json(module_tree, first_module_tree_path)
-            
+
             file_manager.save_json(module_tree, module_tree_path)
             self.job.module_count = len(module_tree)
-            
+
             if self.verbose:
                 self.progress_tracker.update_stage(1.0, f"Created {len(module_tree)} modules")
         except Exception as e:

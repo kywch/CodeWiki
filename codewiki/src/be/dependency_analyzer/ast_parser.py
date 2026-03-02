@@ -18,16 +18,18 @@ logger.setLevel(logging.DEBUG)
 class DependencyParser:
     """Parser for extracting code components from multi-language repositories."""
     
-    def __init__(self, repo_path: str, include_patterns: List[str] = None, exclude_patterns: List[str] = None):
+    def __init__(self, repo_path: str, include_patterns: List[str] = None, exclude_patterns: List[str] = None, target_file: str = None):
         """
         Initialize the dependency parser.
-        
+
         Args:
             repo_path: Path to the repository
             include_patterns: File patterns to include (e.g., ["*.cs", "*.py"])
             exclude_patterns: File/directory patterns to exclude (e.g., ["*Tests*"])
+            target_file: Optional path to a single file for focused documentation
         """
         self.repo_path = os.path.abspath(repo_path)
+        self.target_file = target_file
         self.components: Dict[str, Node] = {}
         self.modules: Set[str] = set()
         self.include_patterns = include_patterns
@@ -49,14 +51,14 @@ class DependencyParser:
             include_patterns=self.include_patterns,
             exclude_patterns=self.exclude_patterns
         )
-        
+
         call_graph_result = self.analysis_service._analyze_call_graph(
-            structure_result["file_tree"], 
+            structure_result["file_tree"],
             self.repo_path
         )
-        
+
         self._build_components_from_analysis(call_graph_result)
-        
+
         logger.debug(f"Found {len(self.components)} components across {len(self.modules)} modules")
         return self.components
     

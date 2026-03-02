@@ -63,6 +63,16 @@ class Config:
     max_token_per_leaf_module: int = DEFAULT_MAX_TOKEN_PER_LEAF_MODULE
     # Agent instructions for customization
     agent_instructions: Optional[Dict[str, Any]] = None
+    # Single-file documentation mode
+    target_file: Optional[str] = None
+    # Claude Code CLI integration
+    use_claude_code: bool = False
+    claude_code_path: Optional[str] = None
+    claude_code_timeout: int = 1800
+    # Gemini CLI integration (larger context window)
+    use_gemini_code: bool = False
+    gemini_code_path: Optional[str] = None
+    gemini_code_timeout: int = 600
     
     @property
     def include_patterns(self) -> Optional[List[str]]:
@@ -155,15 +165,23 @@ class Config:
         main_model: str,
         cluster_model: str,
         fallback_model: str = FALLBACK_MODEL_1,
+
         max_tokens: int = DEFAULT_MAX_TOKENS,
         max_token_per_module: int = DEFAULT_MAX_TOKEN_PER_MODULE,
         max_token_per_leaf_module: int = DEFAULT_MAX_TOKEN_PER_LEAF_MODULE,
         max_depth: int = MAX_DEPTH,
-        agent_instructions: Optional[Dict[str, Any]] = None
+        agent_instructions: Optional[Dict[str, Any]] = None,
+        target_file: Optional[str] = None,
+        use_claude_code: bool = False,
+        claude_code_path: Optional[str] = None,
+        claude_code_timeout: int = 1800,
+        use_gemini_code: bool = False,
+        gemini_code_path: Optional[str] = None,
+        gemini_code_timeout: int = 600,
     ) -> 'Config':
         """
         Create configuration for CLI context.
-        
+
         Args:
             repo_path: Repository path
             output_dir: Output directory for generated docs
@@ -177,13 +195,20 @@ class Config:
             max_token_per_leaf_module: Maximum tokens per leaf module
             max_depth: Maximum depth for hierarchical decomposition
             agent_instructions: Custom agent instructions dict
-            
+            target_file: Optional path to single file for focused documentation
+            use_claude_code: Whether to use Claude Code CLI as LLM backend
+            claude_code_path: Optional path to claude CLI executable
+            claude_code_timeout: Timeout for Claude Code CLI in seconds
+            use_gemini_code: Whether to use Gemini CLI as LLM backend (larger context)
+            gemini_code_path: Optional path to gemini CLI executable
+            gemini_code_timeout: Timeout for Gemini CLI in seconds
+
         Returns:
             Config instance
         """
         repo_name = os.path.basename(os.path.normpath(repo_path))
         base_output_dir = os.path.join(output_dir, "temp")
-        
+
         return cls(
             repo_path=repo_path,
             output_dir=base_output_dir,
@@ -198,5 +223,12 @@ class Config:
             max_tokens=max_tokens,
             max_token_per_module=max_token_per_module,
             max_token_per_leaf_module=max_token_per_leaf_module,
-            agent_instructions=agent_instructions
+            agent_instructions=agent_instructions,
+            target_file=target_file,
+            use_claude_code=use_claude_code,
+            claude_code_path=claude_code_path,
+            claude_code_timeout=claude_code_timeout,
+            use_gemini_code=use_gemini_code,
+            gemini_code_path=gemini_code_path,
+            gemini_code_timeout=gemini_code_timeout,
         )

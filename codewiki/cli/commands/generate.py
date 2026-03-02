@@ -48,6 +48,13 @@ def parse_patterns(patterns_str: str) -> List[str]:
     help="Output directory for generated documentation (default: ./docs)",
 )
 @click.option(
+    "--file",
+    "-f",
+    type=click.Path(exists=True),
+    default=None,
+    help="Generate documentation for a single file instead of the entire repository",
+)
+@click.option(
     "--create-branch",
     is_flag=True,
     help="Create a new git branch for documentation changes",
@@ -78,7 +85,6 @@ def parse_patterns(patterns_str: str) -> List[str]:
 )
 @click.option(
     "--focus",
-    "-f",
     type=str,
     default=None,
     help="Comma-separated modules/paths to focus on (e.g., 'src/core,src/api')",
@@ -126,10 +132,21 @@ def parse_patterns(patterns_str: str) -> List[str]:
     default=None,
     help="Maximum depth for hierarchical decomposition (overrides config)",
 )
+@click.option(
+    "--use-claude-code",
+    is_flag=True,
+    help="Use Claude Code CLI as the LLM backend instead of direct API calls",
+)
+@click.option(
+    "--use-gemini-code",
+    is_flag=True,
+    help="Use Gemini CLI as the LLM backend instead of direct API calls (supports larger context)",
+)
 @click.pass_context
 def generate_command(
     ctx,
     output: str,
+    file: Optional[str],
     create_branch: bool,
     github_pages: bool,
     no_cache: bool,
@@ -142,24 +159,30 @@ def generate_command(
     max_tokens: Optional[int],
     max_token_per_module: Optional[int],
     max_token_per_leaf_module: Optional[int],
-    max_depth: Optional[int]
+    max_depth: Optional[int],
+    use_claude_code: bool,
+    use_gemini_code: bool,
 ):
     """
     Generate comprehensive documentation for a code repository.
-    
+
     Analyzes the current repository and generates documentation using LLM-powered
     analysis. Documentation is output to ./docs/ by default.
-    
+
     Examples:
-    
+
     \b
     # Basic generation
     $ codewiki generate
-    
+
+    \b
+    # Generate documentation for a single file
+    $ codewiki generate --file src/main.py
+
     \b
     # With git branch creation and GitHub Pages
     $ codewiki generate --create-branch --github-pages
-    
+
     \b
     # Force full regeneration
     $ codewiki generate --no-cache
@@ -187,6 +210,14 @@ def generate_command(
     \b
     # Override max depth for hierarchical decomposition
     $ codewiki generate --max-depth 3
+
+    \b
+    # Use Claude Code CLI as the LLM backend
+    $ codewiki generate --use-claude-code
+
+    \b
+    # Use Gemini CLI as the LLM backend (larger context window)
+    $ codewiki generate --use-gemini-code
     """
     logger = create_logger(verbose=verbose)
     start_time = time.time()
@@ -216,9 +247,46 @@ def generate_command(
         
         config = config_manager.get_config()
         api_key = config_manager.get_api_key()
-        
+
         logger.success("Configuration valid")
-        
+
+        # Validate that only one CLI backend is selected
+        if use_claude_code and use_gemini_code:
+            raise ConfigurationError(
+                "Cannot use both --use-claude-code and --use-gemini-code.\n\n"
+                "Please select only one CLI backend."
+            )
+
+        # Validate Claude Code CLI if flag is set
+        if use_claude_code:
+            import shutil
+            claude_path = shutil.which("claude")
+            if not claude_path:
+                raise ConfigurationError(
+                    "Claude Code CLI not found.\n\n"
+                    "The --use-claude-code flag requires Claude Code CLI to be installed.\n\n"
+                    "To install Claude Code CLI, see: https://docs.anthropic.com/en/docs/claude-code\n"
+                    "Make sure 'claude' is available in your PATH."
+                )
+            if verbose:
+                logger.debug(f"Claude Code CLI found: {claude_path}")
+            logger.success("Claude Code CLI available")
+
+        # Validate Gemini CLI if flag is set
+        if use_gemini_code:
+            import shutil
+            gemini_path = shutil.which("gemini")
+            if not gemini_path:
+                raise ConfigurationError(
+                    "Gemini CLI not found.\n\n"
+                    "The --use-gemini-code flag requires Gemini CLI to be installed.\n\n"
+                    "To install Gemini CLI: npm install -g @anthropic-ai/gemini-cli\n"
+                    "Make sure 'gemini' is available in your PATH."
+                )
+            if verbose:
+                logger.debug(f"Gemini CLI found: {gemini_path}")
+            logger.success("Gemini CLI available")
+
         # Validate repository
         logger.step("Validating repository...", 2, 4)
         
@@ -342,6 +410,14 @@ def generate_command(
         elif config.agent_instructions and not config.agent_instructions.is_empty():
             agent_instructions_dict = config.agent_instructions.to_dict()
         
+        # Log Claude Code mode if enabled
+        if use_claude_code and verbose:
+            logger.debug("Claude Code CLI mode enabled")
+
+        # Log Gemini Code mode if enabled
+        if use_gemini_code and verbose:
+            logger.debug("Gemini CLI mode enabled (large context window)")
+
         # Create generator
         generator = CLIDocumentationGenerator(
             repo_path=repo_path,
@@ -359,9 +435,13 @@ def generate_command(
                 'max_token_per_leaf_module': max_token_per_leaf_module if max_token_per_leaf_module is not None else config.max_token_per_leaf_module,
                 # Max depth setting (runtime override takes precedence)
                 'max_depth': max_depth if max_depth is not None else config.max_depth,
+                # CLI integrations
+                'use_claude_code': use_claude_code,
+                'use_gemini_code': use_gemini_code,
             },
             verbose=verbose,
-            generate_html=github_pages
+            generate_html=github_pages,
+            target_file=str(file) if file else None
         )
         
         # Run generation

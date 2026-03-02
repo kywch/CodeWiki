@@ -1,8 +1,3 @@
-# 1. Analysis Core Documentation
-
-I'll create `analysis_core.md` to document the orchestration and file-system scanning logic.
-
-```markdown
 # Analysis Core
 
 The core analysis components provide the orchestration and infrastructure for scanning repositories and generating call graphs.
@@ -260,4 +255,3 @@ The schema layer. Defines the [`Node`](../codewiki/src/be/dependency_analyzer/mo
 
 ## Utils
 - [`ColoredFormatter`](../codewiki/src/be/dependency_analyzer/utils/logging_config.py#L35): Provides enhanced console logging with color-coded severity levels.
-```

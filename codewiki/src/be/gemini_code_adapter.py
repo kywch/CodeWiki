@@ -57,7 +57,9 @@ DEFAULT_MAX_PROMPT_TOKENS = 900_000
 class GeminiCodeError(Exception):
     """Exception raised when Gemini CLI invocation fails."""
 
-    def __init__(self, message: str, returncode: Optional[int] = None, stderr: Optional[str] = None):
+    def __init__(
+        self, message: str, returncode: Optional[int] = None, stderr: Optional[str] = None
+    ):
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr
@@ -120,7 +122,9 @@ def _invoke_gemini_code(
     prompt_chars = len(prompt)
     prompt_tokens_estimate = prompt_chars // 4  # Rough estimate: ~4 chars per token
 
-    logger.info(f"Prompt size: {prompt_chars:,} chars (~{prompt_tokens_estimate:,} tokens estimated)")
+    logger.info(
+        f"Prompt size: {prompt_chars:,} chars (~{prompt_tokens_estimate:,} tokens estimated)"
+    )
 
     # Check prompt size limit before invoking CLI
     if prompt_tokens_estimate > max_prompt_tokens:
@@ -164,20 +168,20 @@ def _invoke_gemini_code(
             )
 
         # Filter out Gemini CLI log lines from stdout
-        output_lines = result.stdout.split('\n')
+        output_lines = result.stdout.split("\n")
         filtered_lines = []
         skip_prefixes = (
-            'YOLO mode',
-            'Loaded cached',
-            'Loading extension',
-            'Initializing',
-            'Connected to',
+            "YOLO mode",
+            "Loaded cached",
+            "Loading extension",
+            "Initializing",
+            "Connected to",
         )
         for line in output_lines:
             if not any(line.startswith(prefix) for prefix in skip_prefixes):
                 filtered_lines.append(line)
 
-        return '\n'.join(filtered_lines)
+        return "\n".join(filtered_lines)
 
     except subprocess.TimeoutExpired:
         raise GeminiCodeError(f"Gemini CLI timed out after {timeout} seconds")
@@ -231,7 +235,9 @@ def gemini_code_cluster(
                     lines.append(f"{'  ' * indent}{key} (current module)")
                 else:
                     lines.append(f"{'  ' * indent}{key}")
-                lines.append(f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}")
+                lines.append(
+                    f"{'  ' * (indent + 1)} Core components: {', '.join(value.get('components', []))}"
+                )
                 children = value.get("children", {})
                 if isinstance(children, dict) and len(children) > 0:
                     lines.append(f"{'  ' * (indent + 1)} Children:")
@@ -270,8 +276,19 @@ def gemini_code_cluster(
             logger.warning("No <GROUPED_COMPONENTS> tag found, attempting to parse raw JSON...")
             response_content = response.strip()
 
+        # Strip markdown code fences if present (Gemini often wraps JSON in ```json ... ```)
+        if response_content.startswith("```"):
+            lines = response_content.splitlines()
+            # Remove the opening fence line (e.g. ```json or ```)
+            lines = lines[1:]
+            # Remove the closing fence line if present
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            response_content = "\n".join(lines).strip()
+
         # Try to parse as JSON first, fall back to eval
         import json
+
         try:
             module_tree = json.loads(response_content)
         except json.JSONDecodeError:

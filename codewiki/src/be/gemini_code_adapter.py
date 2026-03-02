@@ -65,6 +65,40 @@ class GeminiCodeError(Exception):
         self.stderr = stderr
 
 
+def _extract_json_object(text: str) -> Optional[str]:
+    """
+    Extract the first complete JSON object from text using brace balancing.
+    Handles cases where the response is truncated after valid JSON content.
+
+    Returns the JSON string if found, or None.
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_string = False
+    escape_next = False
+    for i, ch in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 def _find_gemini_cli(config_path: Optional[str] = None) -> str:
     """
     Find the Gemini CLI executable.
@@ -286,16 +320,25 @@ def gemini_code_cluster(
                 lines = lines[:-1]
             response_content = "\n".join(lines).strip()
 
-        # Try to parse as JSON first, fall back to eval
+        # Try to parse as JSON first
         import json
 
+        module_tree = None
         try:
             module_tree = json.loads(response_content)
         except json.JSONDecodeError:
-            # Try eval as fallback (for Python dict literals)
-            module_tree = eval(response_content)
+            # Response may be truncated — use brace-balanced extraction to get
+            # the largest complete JSON object present in the response
+            logger.warning("JSON parse failed, attempting brace-balanced extraction...")
+            extracted = _extract_json_object(response_content)
+            if extracted:
+                try:
+                    module_tree = json.loads(extracted)
+                    logger.info(f"Recovered {len(module_tree)} modules from partial response")
+                except json.JSONDecodeError:
+                    pass
 
-        if not isinstance(module_tree, dict):
+        if module_tree is None or not isinstance(module_tree, dict):
             logger.error(f"Invalid module tree format - expected dict, got {type(module_tree)}")
             return {}
 

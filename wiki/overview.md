@@ -47,11 +47,11 @@ The system is organized into five primary modules, each handling a distinct stag
 
 | Module | Description | Documentation |
 | :--- | :--- | :--- |
-| **[CLI](wiki/cli.md)** | The command-line interface for orchestrating the documentation lifecycle, managing configurations, and handling Git integrations. | `codewiki/cli` |
-| **[Backend](wiki/backend.md)** | The core engine that manages the bottom-up generation process, clustering modules, and coordinating AI agents. | `codewiki/src/be` |
-| **[Dependency Analyzer](wiki/dependency_analyzer.md)** | The static analysis powerhouse that uses Tree-Sitter and AST to build comprehensive call graphs across multiple languages. | `codewiki/src/be/dependency_analyzer` |
-| **[Frontend](wiki/frontend.md)** | A FastAPI-powered web application for submitting repositories, monitoring progress, and viewing generated docs. | `codewiki/src/fe` |
-| **[Core](wiki/core.md)** | The foundational layer providing shared configuration management and cross-platform file system utilities. | `codewiki/src` |
+| **[CLI](cli.md)** | The command-line interface for orchestrating the documentation lifecycle, managing configurations, and handling Git integrations. | `codewiki/cli` |
+| **[Backend](backend.md)** | The core engine that manages the bottom-up generation process, clustering modules, and coordinating AI agents. | `codewiki/src/be` |
+| **[Dependency Analyzer](dependency_analyzer.md)** | The static analysis powerhouse that uses Tree-Sitter and AST to build comprehensive call graphs across multiple languages. | `codewiki/src/be/dependency_analyzer` |
+| **[Frontend](frontend.md)** | A FastAPI-powered web application for submitting repositories, monitoring progress, and viewing generated docs. | `codewiki/src/fe` |
+| **[Core](core.md)** | The foundational layer providing shared configuration management and cross-platform file system utilities. | `codewiki/src` |
 
 ### Key Workflows
 1. **Repository Mapping**: The `Dependency Analyzer` scans the source code to build a `module_tree.json` representing the project's architecture.

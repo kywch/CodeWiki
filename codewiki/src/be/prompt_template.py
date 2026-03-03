@@ -36,6 +36,36 @@ Generate documentation following this structure:
 4. Example: [`MyClass`]({relative_root_path}src/my_module.py#L10) or [`utils.py`]({relative_root_path}src/utils.py)
 </CODE_REFERENCES>
 
+<FORMATTING_GUIDE>
+Follow these formatting and content rules exactly for all generated documentation:
+
+1. Document Structure (in this order):
+   - `# Module Name` — exactly one H1 per file, followed by a 1-2 sentence purpose statement
+   - `## Overview` — context and key responsibilities
+   - `## Architecture` — mermaid component diagram (`graph TD`) + narrative
+   - `## Core Components` — detailed breakdown with `###` per component
+   - `## Usage & Extension` — entry points, configuration, how to extend (when applicable)
+   - `## Integration` — links to other wiki module pages
+
+2. Formatting:
+   - Max heading depth `####`. Never skip levels (e.g. `##` to `####`).
+   - Use `-` for unordered lists (never `*`). Use `1.` only for sequential steps.
+   - Use `---` horizontal rules only between `##` sections, never within them.
+   - Use `**bold**` for component names on first mention in a section. Do not over-bold.
+   - Use markdown tables for structured data with 3+ items and 2+ attributes.
+   - Keep paragraphs to 2-3 sentences. Use bullet lists for 3+ items.
+   - Include at least one mermaid diagram per page.
+
+3. Developer Content Requirements:
+   a. Code Reference Density: Every class, function, or method name MUST be a markdown link with file path and line anchor. Zero bare mentions.
+   b. Key Entry Points: Each component section must call out the primary method a developer would invoke, with a one-liner on what it does and returns.
+   c. Configuration: If the module reads config or accepts parameters, include a table with columns: Parameter | Type | Default | Description.
+   d. Extension Points: If the module supports extension (new analyzer, tool, adapter), document the pattern with concrete steps.
+   e. Error Handling: Document what exceptions are raised or caught, and what happens on failure.
+   f. "Start Here" Callout: Begin the Core Components section with a blockquote indicating which file/class to read first, e.g.:
+      > **Start here:** [`ClassName`](path/to/file.py#L10) — read its `main_method()` first.
+</FORMATTING_GUIDE>
+
 <WORKFLOW>
 1. Analyze the provided code components and module structure, explore the not given dependencies between the components if needed
 2. Create the main `{module_name}.md` file with overview and architecture in working directory
@@ -78,6 +108,36 @@ Generate documentation following the following requirements:
 4. Example: [`MyClass`]({relative_root_path}src/my_module.py#L10) or [`utils.py`]({relative_root_path}src/utils.py)
 </CODE_REFERENCES>
 
+<FORMATTING_GUIDE>
+Follow these formatting and content rules exactly for all generated documentation:
+
+1. Document Structure (in this order):
+   - `# Module Name` — exactly one H1 per file, followed by a 1-2 sentence purpose statement
+   - `## Overview` — context and key responsibilities
+   - `## Architecture` — mermaid component diagram (`graph TD`) + narrative
+   - `## Core Components` — detailed breakdown with `###` per component
+   - `## Usage & Extension` — entry points, configuration, how to extend (when applicable)
+   - `## Integration` — links to other wiki module pages
+
+2. Formatting:
+   - Max heading depth `####`. Never skip levels (e.g. `##` to `####`).
+   - Use `-` for unordered lists (never `*`). Use `1.` only for sequential steps.
+   - Use `---` horizontal rules only between `##` sections, never within them.
+   - Use `**bold**` for component names on first mention in a section. Do not over-bold.
+   - Use markdown tables for structured data with 3+ items and 2+ attributes.
+   - Keep paragraphs to 2-3 sentences. Use bullet lists for 3+ items.
+   - Include at least one mermaid diagram per page.
+
+3. Developer Content Requirements:
+   a. Code Reference Density: Every class, function, or method name MUST be a markdown link with file path and line anchor. Zero bare mentions.
+   b. Key Entry Points: Each component section must call out the primary method a developer would invoke, with a one-liner on what it does and returns.
+   c. Configuration: If the module reads config or accepts parameters, include a table with columns: Parameter | Type | Default | Description.
+   d. Extension Points: If the module supports extension (new analyzer, tool, adapter), document the pattern with concrete steps.
+   e. Error Handling: Document what exceptions are raised or caught, and what happens on failure.
+   f. "Start Here" Callout: Begin the Core Components section with a blockquote indicating which file/class to read first, e.g.:
+      > **Start here:** [`ClassName`](path/to/file.py#L10) — read its `main_method()` first.
+</FORMATTING_GUIDE>
+
 <WORKFLOW>
 1. Analyze provided code components and module structure
 2. Explore dependencies between components if needed
@@ -111,6 +171,14 @@ The overview should be a brief documentation of the repository, including:
 - The purpose of the repository
 - The end-to-end architecture of the repository visualized by mermaid diagrams
 - The references to the core modules documentation
+- A "Supplementary Data" section listing the machine-readable data files available in this directory for programmatic use
+
+IMPORTANT: All wiki documentation files (including this overview) live in the SAME directory. When linking to other module documentation, use just the filename with no directory prefix. For example: [Module Name](module_name.md), NOT [Module Name](wiki/module_name.md).
+
+NOTE: This directory also contains machine-readable data files that complement the documentation:
+- `module_tree.json`: The hierarchical module structure and component assignments.
+- `dependency_graph.json`: The full dependency graph with all code components (classes, functions, methods), their file paths, line numbers, source code, and call relationships. This file is especially useful for programmatic code navigation and understanding cross-file dependencies.
+Include a "Supplementary Data" section at the end of the overview that briefly describes these files and their purpose.
 
 Provide `{repo_name}` repo structure and its core modules documentation:
 <REPO_STRUCTURE>
@@ -130,6 +198,8 @@ The overview should be a brief documentation of the module, including:
 - The purpose of the module
 - The architecture of the module visualized by mermaid diagrams
 - The references to the core components documentation
+
+IMPORTANT: All wiki documentation files (including this overview) live in the SAME directory. When linking to other module documentation, use just the filename with no directory prefix. For example: [Module Name](module_name.md), NOT [Module Name](wiki/module_name.md).
 
 Provide repo structure and core components documentation of the `{module_name}` module:
 <REPO_STRUCTURE>

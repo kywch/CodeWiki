@@ -145,7 +145,9 @@ class Config:
         return cls(
             repo_path=args.repo_path,
             output_dir=OUTPUT_BASE_DIR,
-            dependency_graph_dir=os.path.join(OUTPUT_BASE_DIR, DEPENDENCY_GRAPHS_DIR),
+            dependency_graph_dir=os.path.join(
+                OUTPUT_BASE_DIR, DOCS_DIR, f"{sanitized_repo_name}-docs"
+            ),
             docs_dir=os.path.join(OUTPUT_BASE_DIR, DOCS_DIR, f"{sanitized_repo_name}-docs"),
             max_depth=MAX_DEPTH,
             llm_base_url=LLM_BASE_URL,
@@ -199,7 +201,7 @@ class Config:
         return cls(
             repo_path=repo_path,
             output_dir=base_output_dir,
-            dependency_graph_dir=os.path.join(base_output_dir, DEPENDENCY_GRAPHS_DIR),
+            dependency_graph_dir=output_dir,
             docs_dir=output_dir,
             max_depth=max_depth,
             llm_base_url=llm_base_url,

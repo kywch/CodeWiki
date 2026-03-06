@@ -219,6 +219,7 @@ Here is list of all potential core components of the repository (It's normal tha
 </POTENTIAL_CORE_COMPONENTS>
 
 Please group the components into groups such that each group is a set of components that are closely related to each other and together they form a module. DO NOT include components that are not essential to the repository.
+{num_modules_hint}
 Firstly reason about the components and then group them and return the result in the following format:
 <GROUPED_COMPONENTS>
 {{
@@ -256,7 +257,7 @@ Here is list of all potential core components of the module {module_name} (It's 
 </POTENTIAL_CORE_COMPONENTS>
 
 Please group the components into groups such that each group is a set of components that are closely related to each other and together they form a smaller module. DO NOT include components that are not essential to the module.
-
+{num_modules_hint}
 Firstly reason based on given context and then group them and return the result in the following format:
 <GROUPED_COMPONENTS>
 {{
@@ -412,6 +413,20 @@ def format_user_prompt(
     )
 
 
+def _compute_num_modules_hint(potential_core_components: str) -> str:
+    """Suggest a module count based on the number of components."""
+    num_components = potential_core_components.count("\t")
+    if num_components <= 30:
+        return ""
+    suggested = max(5, min(15, num_components // 50))
+    return (
+        f"There are {num_components} components to group. "
+        f"Aim for roughly {suggested}-{suggested + 5} groups at this level. "
+        f"Each group will be further broken down into sub-modules separately, "
+        f"so focus on high-level grouping here."
+    )
+
+
 def format_cluster_prompt(
     potential_core_components: str, module_tree: dict[str, any] = {}, module_name: str = None
 ) -> str:
@@ -443,13 +458,19 @@ def format_cluster_prompt(
     _format_module_tree(module_tree, 0)
     formatted_module_tree = "\n".join(lines)
 
+    hint = _compute_num_modules_hint(potential_core_components)
+
     if module_tree == {}:
-        return CLUSTER_REPO_PROMPT.format(potential_core_components=potential_core_components)
+        return CLUSTER_REPO_PROMPT.format(
+            potential_core_components=potential_core_components,
+            num_modules_hint=hint,
+        )
     else:
         return CLUSTER_MODULE_PROMPT.format(
             potential_core_components=potential_core_components,
             module_tree=formatted_module_tree,
             module_name=module_name,
+            num_modules_hint=hint,
         )
 
 

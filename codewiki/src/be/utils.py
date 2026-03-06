@@ -9,6 +9,19 @@ import traceback
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------
+# ---------------------- Filename Sanitization ---------------
+# ------------------------------------------------------------
+
+def sanitize_filename(name: str) -> str:
+    """Convert a module name to a safe lowercase-hyphenated filename (without extension)."""
+    name = name.strip().lower()
+    name = re.sub(r"[^\w\s-]", "", name)   # remove non-word chars except spaces/hyphens
+    name = re.sub(r"[\s_]+", "-", name)     # spaces/underscores → hyphens
+    name = re.sub(r"-+", "-", name)         # collapse multiple hyphens
+    return name.strip("-")
+
+
+# ------------------------------------------------------------
 # ---------------------- Complexity Check --------------------
 # ------------------------------------------------------------
 

@@ -49,7 +49,7 @@ from codewiki.src.be.prompt_template import (
     format_system_prompt,
     format_leaf_system_prompt,
 )
-from codewiki.src.be.utils import is_complex_module
+from codewiki.src.be.utils import is_complex_module, sanitize_filename
 from codewiki.src.config import (
     Config,
     MODULE_TREE_FILENAME,
@@ -147,7 +147,7 @@ class AgentOrchestrator:
             return module_tree
 
         # check if module docs already exists
-        docs_path = os.path.join(working_dir, f"{module_name}.md")
+        docs_path = os.path.join(working_dir, f"{sanitize_filename(module_name)}.md")
         if os.path.exists(docs_path):
             logger.info(f"✓ Module docs already exists at {docs_path}")
             return module_tree

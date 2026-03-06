@@ -24,6 +24,7 @@ from codewiki.src.config import (
 )
 from codewiki.src.utils import file_manager
 from codewiki.src.be.agent_orchestrator import AgentOrchestrator
+from codewiki.src.be.utils import sanitize_filename
 
 
 class DocumentationGenerator:
@@ -117,12 +118,13 @@ class DocumentationGenerator:
             module_info = module_info["children"]
 
         for child_name, child_info in module_info.items():
-            if os.path.exists(os.path.join(working_dir, f"{child_name}.md")):
+            safe_child_name = sanitize_filename(child_name)
+            if os.path.exists(os.path.join(working_dir, f"{safe_child_name}.md")):
                 child_info["docs"] = file_manager.load_text(
-                    os.path.join(working_dir, f"{child_name}.md")
+                    os.path.join(working_dir, f"{safe_child_name}.md")
                 )
             else:
-                child_docs_path = os.path.join(working_dir, f"{child_name}.md")
+                child_docs_path = os.path.join(working_dir, f"{safe_child_name}.md")
                 logger.warning(f"Module docs not found at {child_docs_path}")
                 child_info["docs"] = ""
 
@@ -233,7 +235,7 @@ class DocumentationGenerator:
         # check if parent docs already exists
         parent_docs_path = os.path.join(
             working_dir,
-            f"{module_name if len(module_path) >= 1 else OVERVIEW_FILENAME.replace('.md', '')}.md",
+            f"{sanitize_filename(module_name) if len(module_path) >= 1 else OVERVIEW_FILENAME.replace('.md', '')}.md",
         )
         if os.path.exists(parent_docs_path):
             logger.info(f"✓ Parent docs already exists at {parent_docs_path}")

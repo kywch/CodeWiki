@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from codewiki.src.be.utils import sanitize_filename
 from codewiki.src.config import Config
 
 
@@ -268,3 +269,60 @@ class TestAgentOrchestratorGeminiCLI:
         )
         mock_call.assert_not_called()
         mock_save.assert_not_called()
+
+    @patch("codewiki.src.be.llm_services.call_llm")
+    @patch("codewiki.src.utils.file_manager.load_json", return_value={})
+    @patch("codewiki.src.utils.file_manager.save_text")
+    @patch("os.path.exists", return_value=False)
+    def test_one_shot_saves_with_sanitized_filename(
+        self, mock_exists, mock_save, mock_load, mock_call, orchestrator
+    ):
+        """File should be saved with sanitized (lowercase, hyphenated) name."""
+        mock_call.return_value = "<DOCUMENTATION>content</DOCUMENTATION>"
+
+        asyncio.get_event_loop().run_until_complete(
+            orchestrator.process_module(
+                module_name="Core Engine",
+                components={},
+                core_component_ids=[],
+                module_path=["Core Engine"],
+                working_dir="/tmp/fake_output/wiki",
+            )
+        )
+
+        saved_path = mock_save.call_args[0][1]
+        assert "core-engine.md" in saved_path
+        assert "Core Engine.md" not in saved_path
+
+
+# ===================================================================
+# sanitize_filename
+# ===================================================================
+
+
+class TestSanitizeFilename:
+    """Test filename sanitization for wiki page files."""
+
+    def test_spaces_to_hyphens(self):
+        assert sanitize_filename("Core Engine") == "core-engine"
+
+    def test_uppercase_to_lowercase(self):
+        assert sanitize_filename("API Gateway") == "api-gateway"
+
+    def test_underscores_to_hyphens(self):
+        assert sanitize_filename("my_module") == "my-module"
+
+    def test_special_chars_removed(self):
+        assert sanitize_filename("Data Processing & Storage") == "data-processing-storage"
+
+    def test_multiple_spaces_collapsed(self):
+        assert sanitize_filename("foo   bar") == "foo-bar"
+
+    def test_leading_trailing_stripped(self):
+        assert sanitize_filename("  hello  ") == "hello"
+
+    def test_mixed_separators(self):
+        assert sanitize_filename("some_module - v2") == "some-module-v2"
+
+    def test_already_clean(self):
+        assert sanitize_filename("clean-name") == "clean-name"

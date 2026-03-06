@@ -4,7 +4,7 @@ from codewiki.src.be.agent_tools.deps import CodeWikiDeps
 from codewiki.src.be.agent_tools.read_code_components import read_code_components_tool
 from codewiki.src.be.agent_tools.str_replace_editor import str_replace_editor_tool
 from codewiki.src.be.llm_services import create_fallback_models
-from codewiki.src.be.prompt_template import SYSTEM_PROMPT, LEAF_SYSTEM_PROMPT, format_user_prompt
+from codewiki.src.be.prompt_template import format_system_prompt, format_leaf_system_prompt, format_user_prompt
 from codewiki.src.be.utils import is_complex_module, count_tokens
 from codewiki.src.be.cluster_modules import format_potential_core_components
 
@@ -23,11 +23,17 @@ async def generate_sub_module_documentation(
         sub_module_specs: The specs of the sub-modules to generate documentation for. E.g. {"sub_module_1": ["core_component_1.1", "core_component_1.2"], "sub_module_2": ["core_component_2.1", "core_component_2.2"], ...}
     """
 
+    import os
+
     deps = ctx.deps
     previous_module_name = deps.current_module_name
-    
+
     # Create fallback models from config
     fallback_models = create_fallback_models(deps.config)
+
+    # Compute relative path from docs dir to repo root
+    relative_root_path = os.path.relpath(deps.absolute_repo_path, deps.absolute_docs_path)
+    relative_root_path = relative_root_path + "/" if relative_root_path != "." else "./"
 
     # add the sub-module to the module tree
     value = deps.module_tree
@@ -51,7 +57,7 @@ async def generate_sub_module_documentation(
                 model=fallback_models,
                 name=sub_module_name,
                 deps_type=CodeWikiDeps,
-                system_prompt=SYSTEM_PROMPT.format(module_name=sub_module_name, custom_instructions=ctx.deps.custom_instructions),
+                system_prompt=format_system_prompt(sub_module_name, ctx.deps.custom_instructions, relative_root_path),
                 tools=[read_code_components_tool, str_replace_editor_tool, generate_sub_module_documentation_tool],
             )
         else:
@@ -59,7 +65,7 @@ async def generate_sub_module_documentation(
                 model=fallback_models,
                 name=sub_module_name,
                 deps_type=CodeWikiDeps,
-                system_prompt=LEAF_SYSTEM_PROMPT.format(module_name=sub_module_name, custom_instructions=ctx.deps.custom_instructions),
+                system_prompt=format_leaf_system_prompt(sub_module_name, ctx.deps.custom_instructions, relative_root_path),
                 tools=[read_code_components_tool, str_replace_editor_tool],
             )
 
@@ -86,7 +92,8 @@ async def generate_sub_module_documentation(
     # restore the previous module name
     deps.current_module_name = previous_module_name
 
-    return f"Generate successfully. Documentations: {', '.join([key + '.md' for key in sub_module_specs.keys()])} are saved in the working directory."
+    from codewiki.src.be.utils import sanitize_filename
+    return f"Generate successfully. Documentations: {', '.join([sanitize_filename(key) + '.md' for key in sub_module_specs.keys()])} are saved in the working directory."
 
 
 generate_sub_module_documentation_tool = Tool(function=generate_sub_module_documentation, name="generate_sub_module_documentation", description="Generate detailed description of a given sub-module specs to the sub-agents", takes_ctx=True)

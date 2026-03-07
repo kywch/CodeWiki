@@ -7,6 +7,7 @@ keeping the module tree and dependency graph intact.
 
 import sys
 import os
+import re
 import logging
 import traceback
 import asyncio
@@ -298,15 +299,30 @@ async def _regenerate_broken_pages(
         except Exception:
             pass  # Skip components that don't parse
 
-    # Map filenames back to module names (handle both old underscore and new hyphen styles)
+    # Map filenames back to module names.
+    # Normalize both the on-disk filename and module name to a canonical form
+    # (lowercase, hyphens/underscores/spaces collapsed) so that mismatches
+    # between old (underscore) and new (hyphen) naming styles are handled.
+    def _normalize(name: str) -> str:
+        """Collapse underscores, hyphens, spaces into a single canonical form."""
+        return re.sub(r"[-_\s]+", "-", name.strip().lower())
+
     filename_to_module: Dict[str, str] = {}
+    # Build a normalized lookup from module names
+    norm_to_module: Dict[str, str] = {}
     for module_name in module_tree:
-        sanitized = sanitize_filename(module_name) + ".md"
-        filename_to_module[sanitized] = module_name
-        # Also map the raw module name (for wikis generated before sanitize_filename change)
-        raw = module_name + ".md"
-        if raw not in filename_to_module:
-            filename_to_module[raw] = module_name
+        norm_to_module[_normalize(module_name)] = module_name
+        # Also index by sanitized and raw forms for exact matches
+        filename_to_module[sanitize_filename(module_name) + ".md"] = module_name
+        filename_to_module[module_name + ".md"] = module_name
+
+    # For any broken page filename, try exact match first, then normalized match
+    def _resolve_module(filename: str) -> Optional[str]:
+        if filename in filename_to_module:
+            return filename_to_module[filename]
+        stem = filename.removesuffix(".md")
+        norm = _normalize(stem)
+        return norm_to_module.get(norm)
 
     # Create agent orchestrator
     orchestrator = AgentOrchestrator(backend_config)
@@ -318,7 +334,7 @@ async def _regenerate_broken_pages(
             click.echo(f"  Skipping overview.md (regenerate with 'codewiki generate')")
             continue
 
-        module_name = filename_to_module.get(filename)
+        module_name = _resolve_module(filename)
         if module_name is None:
             click.echo(click.style(f"  {filename}: no matching module found, skipping", fg="yellow"))
             continue

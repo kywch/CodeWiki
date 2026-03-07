@@ -85,8 +85,27 @@ def validate_wiki_page(
                     PageIssue("missing_section", f"Missing required section: {section}")
                 )
 
-    # Check markdown links
-    _validate_links(content, wiki_dir, repo_path, result)
+    # Check for reasoning traces / thinking blocks at the start of the page
+    # LLMs sometimes emit these before the actual content
+    first_line = stripped.split("\n", 1)[0].strip()
+    reasoning_patterns = [
+        first_line.startswith("<"),  # XML-style thinking tags
+        first_line.lower().startswith("okay"),
+        first_line.lower().startswith("let me"),
+        first_line.lower().startswith("i'll"),
+        first_line.lower().startswith("i need to"),
+        first_line.lower().startswith("alright"),
+    ]
+    if any(reasoning_patterns) and not first_line.startswith("#"):
+        result.issues.append(
+            PageIssue(
+                "reasoning_trace",
+                f"Page starts with likely reasoning trace: {first_line[:80]}..."
+            )
+        )
+
+    # TODO: link validation disabled for now — will be replaced with link repair
+    # _validate_links(content, wiki_dir, repo_path, result)
 
     return result
 

@@ -1,104 +1,106 @@
 # Documentation Engine
 
-The Documentation Engine is the central orchestration layer of CodeWiki, responsible for managing AI agents that analyze source code and generate structured, hierarchical documentation.
+The documentation engine is the core intelligence layer of CodeWiki, responsible for orchestrating AI agents to generate comprehensive system documentation by analyzing code structure and dependencies.
+
+---
 
 ## Overview
 
-The Documentation Engine implements a bottom-up documentation strategy. It leverages dependency analysis to cluster components into logical modules and then employs LLM-powered agents to document them in topological order (leaf modules first). This ensures that parent modules can be documented with full context of their children's functionality.
+The **Documentation Engine** acts as the bridge between raw source code analysis and human-readable documentation. It utilizes a dynamic programming approach, processing leaf modules first to build a foundation of knowledge that informs the generation of higher-level parent module overviews and the final repository summary.
 
 Key responsibilities include:
-- **Orchestration**: Managing the end-to-end flow from dependency graphing to final markdown generation.
-- **Agent Management**: Creating and configuring specialized agents based on module complexity.
-- **Context Handling**: Preparing and injecting relevant code snippets and dependency data into agent prompts.
-- **Tooling**: Providing agents with safe, contextual tools for reading code and editing documentation.
+- **Agent Orchestration**: Managing the lifecycle of AI agents using the `pydantic_ai` framework.
+- **Topological Generation**: Ensuring modules are documented in dependency order (leaf-to-root).
+- **Tool Integration**: Providing agents with specialized tools to read source code and safely edit documentation files.
+- **Context Management**: Maintaining a shared state across agent runs to ensure consistency and cross-module referencing.
 
 ---
 
 ## Architecture
 
-The engine follows a layered architecture where the high-level generator coordinates the workflow, the orchestrator manages agent lifecycle, and specialized tools interface with the filesystem.
+The engine follows a hierarchical orchestration pattern where the main generator delegates complex module analysis to specialized agents.
 
 ```mermaid
 graph TD
-    DG[DocumentationGenerator] --> GB[DependencyGraphBuilder]
-    DG --> CM[cluster_modules]
+    DG[DocumentationGenerator] --> DGB[DependencyGraphBuilder]
+    DG --> CM[Module Clustering]
     DG --> AO[AgentOrchestrator]
-    AO --> AG[Pydantic AI Agent]
-    AG --> D[CodeWikiDeps]
-    AG --> T[Agent Tools]
-    T --> ET[EditTool]
-    T --> RC[read_code_components_tool]
-    T --> GS[generate_sub_module_documentation_tool]
+    AO --> Agent[AI Agent - pydantic_ai]
+    Agent --> Tools[Agent Tools]
+    Tools --> ET[EditTool]
+    Tools --> RCD[Read Code Components]
+    Agent --> Deps[CodeWikiDeps]
     
-    subgraph "External Modules"
-        GB
-        CM
+    subgraph "Process Flow"
+        Step1[Build Dependency Graph] --> Step2[Cluster Modules]
+        Step2 --> Step3[Topological Sort]
+        Step3 --> Step4[Generate Leaf Docs]
+        Step4 --> Step5[Generate Parent Overviews]
     end
 ```
 
-The **DocumentationGenerator** initializes the process by invoking the [`DependencyGraphBuilder`](dependency_analysis_core.md) and clustering components. It then iterates through the module tree, delegating specific module analysis to the **AgentOrchestrator**.
+### Narrative Flow
+1. **Analysis**: The [`DocumentationGenerator`](../codewiki/src/be/documentation_generator.py#L30) invokes the [`DependencyGraphBuilder`](../codewiki/src/be/dependency_analyzer/dependency_graphs_builder.py#L16) to map component relationships.
+2. **Organization**: Components are grouped into logical modules, and a processing order is determined using a topological sort.
+3. **Execution**: The [`AgentOrchestrator`](../codewiki/src/be/agent_orchestrator.py#L62) creates instances of AI agents configured with appropriate system prompts and tools.
+4. **Refinement**: Leaf modules are documented using detailed component analysis, while parent modules are synthesized from their children's documentation.
 
 ---
 
 ## Core Components
 
-> **Start here:** [`DocumentationGenerator`](../codewiki/src/be/documentation_generator.py#L29) — read its `run()` method first to understand the end-to-end documentation lifecycle.
+> **Start here:** [`DocumentationGenerator`](../codewiki/src/be/documentation_generator.py#L30) — read its `run()` method first to understand the end-to-end documentation workflow.
 
 ### DocumentationGenerator
-The primary entry point for the documentation system. It handles the high-level logic of building the dependency graph, clustering modules, and determining the processing order.
+The [`DocumentationGenerator`](../codewiki/src/be/documentation_generator.py#L30) is the high-level coordinator of the entire system. It manages the directory structure, builds the dependency graph, and iterates through the module tree to trigger agent processing.
 
-- **Primary Method**: [`run()`](../codewiki/src/be/documentation_generator.py#L182) — Orchestrates the entire process from dependency analysis to metadata creation.
-- **Key Responsibility**: Implements the "Dynamic Programming" approach where leaf modules are documented first, followed by parent summaries.
+- **Primary Method**: `run()` triggers the full pipeline from graph building to metadata creation.
+- **Key Method**: `get_processing_order()` performs the topological sort to ensure dependencies are documented first.
 
 ### AgentOrchestrator
-Responsible for the creation and execution of AI agents. It decides the "sophistication" of the agent based on the complexity of the module being documented.
+The [`AgentOrchestrator`](../codewiki/src/be/agent_orchestrator.py#L62) handles the instantiation and execution of AI agents. It determines the complexity of a module and assigns the correct system prompts (leaf vs. complex) and toolsets.
 
-- **Primary Method**: [`process_module()`](../codewiki/src/be/agent_orchestrator.py#L102) — Sets up the environment, creates the agent, and executes the documentation task.
-- **Agent Creation**: Uses [`create_agent()`](../codewiki/src/be/agent_orchestrator.py#L75) to attach relevant tools like [`read_code_components_tool`](../codewiki/src/be/agent_tools/read_code_components.py) and [`str_replace_editor_tool`](../codewiki/src/be/agent_tools/str_replace_editor.py).
+- **Primary Method**: `process_module()` creates an agent and runs it against a specific set of code components.
+- **Agent Creation**: `create_agent()` configures `pydantic_ai` agents with fallback models and custom instructions.
 
 ### CodeWikiDeps
-A context-carrying dataclass used by `pydantic-ai` to provide agents with access to repository paths, configuration, and the shared module registry.
+The [`CodeWikiDeps`](../codewiki/src/be/agent_tools/deps.py#L6) dataclass serves as the runtime context for AI agents. It provides agents with paths to the repository, the documentation directory, and the current state of the module tree.
 
-- **Location**: [`CodeWikiDeps`](../codewiki/src/be/agent_tools/deps.py#L6)
-- **Content**: Includes the absolute documentation path, repository path, module tree, and current analysis depth.
+### EditTool & Filesystem Utilities
+Agents interact with the documentation files via the [`EditTool`](../codewiki/src/be/agent_tools/str_replace_editor.py#L349). This tool provides a safe interface for viewing, creating, and editing Markdown files using string replacement or line insertion.
 
-### EditTool
-A robust filesystem editor that allows agents to view, create, and modify documentation files safely. It supports "undo" operations and contextual snippets.
-
-- **Primary Method**: [`__call__()`](../codewiki/src/be/agent_tools/str_replace_editor.py#L380) — Dispatches commands such as `view`, `create`, `str_replace`, and `insert`.
-- **Safety**: Prevents agents from overwriting files via the `create` command and validates Mermaid diagrams after edits.
-
-### Helper Components
-The following utilities support the [`EditTool`](../codewiki/src/be/agent_tools/str_replace_editor.py#L349) in providing efficient context:
-
-1. **[`Filemap`](../codewiki/src/be/agent_tools/str_replace_editor.py#L197)**: Uses tree-sitter to elide function bodies in large files, providing a high-level overview of class structures.
-2. **[`WindowExpander`](../codewiki/src/be/agent_tools/str_replace_editor.py#L235)**: Expands requested line ranges to ensure code snippets include complete function or class definitions, preventing fragmented context.
+- **Supporting Tools**:
+    - [`Filemap`](../codewiki/src/be/agent_tools/str_replace_editor.py#L197): Abbreviates large source files for efficient context usage.
+    - [`WindowExpander`](../codewiki/src/be/agent_tools/str_replace_editor.py#L235): Expands code viewports to include full class or function definitions.
 
 ---
 
 ## Usage & Extension
 
 ### Configuration
-The engine is configured via the [`Config`](core_system_utilities.md) object, which defines models, paths, and depth limits.
+The engine is configured via the [`Config`](../codewiki/src/config.py#L52) object, which defines the LLM models and project paths.
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `main_model` | `str` | N/A | Primary LLM used for generation. |
-| `max_depth` | `int` | 5 | Maximum depth for recursive sub-module generation. |
-| `use_gemini_cli` | `bool` | `False` | If true, uses one-shot generation via Gemini CLI instead of interactive agents. |
+| :--- | :--- | :--- | :--- |
+| `repo_path` | `str` | N/A | Path to the source code to be documented. |
+| `docs_dir` | `str` | `docs` | Target directory for the generated wiki. |
+| `main_model` | `str` | N/A | The primary LLM used for high-level reasoning. |
+| `max_depth` | `int` | `3` | Maximum clustering depth for large projects. |
+| `use_gemini_cli` | `bool` | `False` | Enables one-shot predictive generation for speed. |
 
 ### Adding New Tools
-To extend the engine with new capabilities (e.g., a tool to search for specific patterns), follow these steps:
-1. Define the tool function using the `@tool` decorator or `Tool` class from `pydantic-ai`.
-2. Update the [`AgentOrchestrator.create_agent()`](../codewiki/src/be/agent_orchestrator.py#L75) method to include the new tool in the `tools` list.
-3. Ensure the tool accepts [`CodeWikiDeps`](../codewiki/src/be/agent_tools/deps.py#L6) if it requires repository context.
+To extend the agent's capabilities (e.g., adding a diagram generator or an external API checker):
+1. Define the tool function using `pydantic_ai` decorators.
+2. Add the tool to the `tools` list in [`AgentOrchestrator.create_agent()`](../codewiki/src/be/agent_orchestrator.py#L76).
+3. Update the system prompts in [`codewiki.src.be.prompt_template`](../codewiki/src/be/prompt_template.py) to inform the agent of the new capability.
 
 ---
 
 ## Integration
 
-The Documentation Engine sits at the core of the backend, interacting with several other modules:
+The Documentation Engine integrates with several other core modules:
 
-- **[`dependency_analysis_core`](dependency_analysis_core.md)**: Provides the underlying graph data used to determine module boundaries.
-- **[`core_system_utilities`](core_system_utilities.md)**: Provides the [`Config`](../codewiki/src/config.py#L52) and [`FileManager`](../codewiki/src/utils.py#L10) for persistent state and file I/O.
-- **[`cli`](cli.md)**: The [`CLIDocumentationGenerator`](../codewiki/src/cli/adapters/doc_generator.py#L26) wraps this engine to provide a terminal interface for users.
+- **[CLI](cli.md)**: The user interface that triggers the `DocumentationGenerator`.
+- **[Dependency Analysis Core](dependency_analysis_core.md)**: Provides the underlying component graph and AST analysis.
+- **[Language Analyzers](language_analyzers.md)**: Used by the analysis core to extract symbols from various programming languages.
+- **[Core System Utilities](core_system_utilities.md)**: Provides the [`Config`](../codewiki/src/config.py#L52) and [`FileManager`](../codewiki/src/utils.py#L10) for persistent state.

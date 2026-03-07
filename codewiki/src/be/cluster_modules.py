@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 from codewiki.src.be.dependency_analyzer.models.core import Node
 from codewiki.src.be.llm_services import call_llm
-from codewiki.src.be.utils import count_tokens
+from codewiki.src.be.utils import count_tokens, sanitize_filename
 from codewiki.src.config import Config
 from codewiki.src.be.prompt_template import format_cluster_prompt
 
@@ -78,6 +78,11 @@ def cluster_modules(
         logger.error(f"Failed to parse LLM response: {e}. Response: {response[:200]}...")
         logger.error(f"Traceback: {traceback.format_exc()}")
         return {}
+
+    # Sanitize module names to lowercase-hyphenated format
+    module_tree = {
+        sanitize_filename(k): v for k, v in module_tree.items()
+    }
 
     # check if the module tree is valid
     if len(module_tree) <= 1:

@@ -290,6 +290,25 @@ async def _regenerate_broken_pages(
     # Load module tree and components from existing wiki data (no re-analysis)
     module_tree = file_manager.load_json(str(wiki_path / "module_tree.json"))
 
+    # Sanitize module names in-place and persist back to JSON files
+    def _sanitize_tree(tree: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = {}
+        for key, info in tree.items():
+            new_key = sanitize_filename(key)
+            children = info.get("children", {})
+            if children:
+                info["children"] = _sanitize_tree(children)
+            sanitized[new_key] = info
+        return sanitized
+
+    module_tree = _sanitize_tree(module_tree)
+    file_manager.save_json(module_tree, str(wiki_path / "module_tree.json"))
+    # Also update first_module_tree.json if it exists
+    first_tree_path = wiki_path / "first_module_tree.json"
+    if first_tree_path.exists():
+        first_tree = file_manager.load_json(str(first_tree_path))
+        file_manager.save_json(_sanitize_tree(first_tree), str(first_tree_path))
+
     dep_graph_path = str(wiki_path / "dependency_graph.json")
     raw_components = file_manager.load_json(dep_graph_path)
     components: Dict[str, Any] = {}
@@ -308,13 +327,23 @@ async def _regenerate_broken_pages(
         return re.sub(r"[-_\s]+", "-", name.strip().lower())
 
     filename_to_module: Dict[str, str] = {}
-    # Build a normalized lookup from module names
+    # Build a normalized lookup from module names (including nested children)
     norm_to_module: Dict[str, str] = {}
-    for module_name in module_tree:
-        norm_to_module[_normalize(module_name)] = module_name
-        # Also index by sanitized and raw forms for exact matches
-        filename_to_module[sanitize_filename(module_name) + ".md"] = module_name
-        filename_to_module[module_name + ".md"] = module_name
+    # Also store module info for child modules (name -> info dict)
+    child_module_info: Dict[str, Dict[str, Any]] = {}
+
+    def _index_modules(tree: Dict[str, Any]) -> None:
+        for module_name, info in tree.items():
+            norm_to_module[_normalize(module_name)] = module_name
+            filename_to_module[sanitize_filename(module_name) + ".md"] = module_name
+            filename_to_module[module_name + ".md"] = module_name
+            children = info.get("children", {})
+            if children:
+                for child_name, child_info in children.items():
+                    child_module_info[child_name] = child_info
+                _index_modules(children)
+
+    _index_modules(module_tree)
 
     # For any broken page filename, try exact match first, then normalized match
     def _resolve_module(filename: str) -> Optional[str]:
@@ -339,7 +368,7 @@ async def _regenerate_broken_pages(
             click.echo(click.style(f"  {filename}: no matching module found, skipping", fg="yellow"))
             continue
 
-        module_info = module_tree.get(module_name, {})
+        module_info = module_tree.get(module_name) or child_module_info.get(module_name, {})
         core_component_ids = module_info.get("components", [])
 
         # Back up the broken page

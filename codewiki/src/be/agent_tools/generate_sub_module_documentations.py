@@ -5,7 +5,7 @@ from codewiki.src.be.agent_tools.read_code_components import read_code_component
 from codewiki.src.be.agent_tools.str_replace_editor import str_replace_editor_tool
 from codewiki.src.be.llm_services import create_fallback_models
 from codewiki.src.be.prompt_template import format_system_prompt, format_leaf_system_prompt, format_user_prompt
-from codewiki.src.be.utils import is_complex_module, count_tokens
+from codewiki.src.be.utils import is_complex_module, count_tokens, sanitize_filename
 from codewiki.src.be.cluster_modules import format_potential_core_components
 
 import logging
@@ -27,6 +27,11 @@ async def generate_sub_module_documentation(
 
     deps = ctx.deps
     previous_module_name = deps.current_module_name
+
+    # Sanitize sub-module names to lowercase-hyphenated format
+    sub_module_specs = {
+        sanitize_filename(k): v for k, v in sub_module_specs.items()
+    }
 
     # Create fallback models from config
     fallback_models = create_fallback_models(deps.config)
@@ -92,7 +97,6 @@ async def generate_sub_module_documentation(
     # restore the previous module name
     deps.current_module_name = previous_module_name
 
-    from codewiki.src.be.utils import sanitize_filename
     return f"Generate successfully. Documentations: {', '.join([sanitize_filename(key) + '.md' for key in sub_module_specs.keys()])} are saved in the working directory."
 
 

@@ -52,12 +52,16 @@ def validate_wiki_page(
 
     Args:
         md_path: Absolute path to the markdown file
-        wiki_dir: Absolute path to the wiki directory
+        wiki_dir: Absolute path to the wiki directory (resolved via realpath for symlinks)
         repo_path: Absolute path to the repository root
 
     Returns:
         PageValidationResult with any issues found
     """
+    # Use repo_path to resolve links, since wiki links like ../codewiki/...
+    # are authored relative to the wiki's logical position inside the repo.
+    # This handles symlinked wiki dirs correctly.
+    repo_path = os.path.realpath(repo_path)
     filename = os.path.basename(md_path)
     result = PageValidationResult(filename=filename)
 
@@ -115,8 +119,16 @@ def _validate_links(
         if not file_part:
             continue
 
-        # Resolve the path relative to wiki_dir
+        # Resolve relative links. Wiki pages use paths like ../codewiki/foo.py
+        # which are relative to the wiki dir's position inside the repo.
+        # If wiki_dir is symlinked from outside the repo, we must resolve
+        # against repo_path to find the actual files.
         resolved = os.path.normpath(os.path.join(wiki_dir, file_part))
+        if not os.path.exists(resolved) and file_part.startswith(".."):
+            # Fallback: resolve as if wiki dir is a direct child of repo_path
+            resolved = os.path.normpath(
+                os.path.join(repo_path, os.path.basename(wiki_dir), file_part)
+            )
 
         if not os.path.exists(resolved):
             result.issues.append(
